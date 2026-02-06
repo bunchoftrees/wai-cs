@@ -28,7 +28,7 @@ type DatabaseConfig struct {
 	Password string
 	DBName   string
 	SSLMode  string
-	MaxConns int32
+	MaxConns int
 }
 
 type JWTConfig struct {
@@ -66,7 +66,7 @@ func Load() *Config {
 			Password: getEnv("DB_PASSWORD", "ssiq_dev_password"),
 			DBName:   getEnv("DB_NAME", "ssiq"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
-			MaxConns: int32(getIntEnv("DB_MAX_CONNS", 20)),
+			MaxConns: int(getIntEnv("DB_MAX_CONNS", 20)),
 		},
 		JWT: JWTConfig{
 			Secret:      getEnv("JWT_SECRET", "dev-secret-change-in-production"),

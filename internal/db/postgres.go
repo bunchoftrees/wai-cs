@@ -24,7 +24,7 @@ func Connect(ctx context.Context, cfg config.DatabaseConfig) (*pgxpool.Pool, err
 		return nil, fmt.Errorf("parse db config: %w", err)
 	}
 
-	poolCfg.MaxConns = cfg.MaxConns
+	poolCfg.MaxConns = int32(cfg.MaxConns)
 	poolCfg.MinConns = 2
 	poolCfg.MaxConnLifetime = 30 * time.Minute
 	poolCfg.MaxConnIdleTime = 5 * time.Minute

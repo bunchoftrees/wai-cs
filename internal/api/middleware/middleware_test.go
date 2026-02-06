@@ -23,7 +23,7 @@ func testJWTConfig() *config.JWTConfig {
 	}
 }
 
-func setupRouter(jwtCfg *config.JWTConfig) *gin.Engine {
+func setupRouter(_ *config.JWTConfig) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.Use(CORSMiddleware())

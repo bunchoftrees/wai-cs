@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Selection IQ — API Explorer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css">
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --border: #2e3345;
+            --text: #e1e4ed;
+            --text-dim: #8b8fa3;
+            --accent: #6c7cff;
+            --green: #34d399;
+            --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+        }
+        body {
+            margin: 0;
+            background: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+        }
+
+        /* Top bar matching demo console */
+        .top-bar {
+            border-bottom: 1px solid var(--border);
+            padding: .75rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .top-bar h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: -.01em;
+            color: var(--text);
+            margin: 0;
+        }
+        .top-bar h1 span { color: var(--accent); }
+        .top-bar .links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        .top-bar a {
+            color: var(--text-dim);
+            text-decoration: none;
+            font-size: .8rem;
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            transition: all .15s;
+        }
+        .top-bar a:hover { border-color: var(--accent); color: var(--accent); }
+        .top-bar a.active { background: rgba(108,124,255,.15); color: var(--accent); border-color: var(--accent); }
+
+        /* Quick-auth helper */
+        .auth-helper {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin: 1rem 2rem;
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        .auth-helper label {
+            font-size: .75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .auth-helper select, .auth-helper input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: .8rem;
+            font-family: var(--mono);
+        }
+        .auth-helper select:focus, .auth-helper input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .auth-helper button {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 5px 14px;
+            border-radius: 4px;
+            font-size: .8rem;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .auth-helper button:hover { opacity: .9; }
+        .auth-helper .token-display {
+            font-family: var(--mono);
+            font-size: .72rem;
+            color: var(--green);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Dark-theme overrides for Swagger UI */
+        .swagger-ui {
+            padding: 0 1rem;
+        }
+        .swagger-ui .topbar { display: none; }
+
+        /* Dark backgrounds */
+        .swagger-ui,
+        .swagger-ui .scheme-container,
+        .swagger-ui .opblock-tag,
+        .swagger-ui section.models,
+        .swagger-ui section.models .model-container,
+        .swagger-ui .model-box,
+        .swagger-ui .opblock .opblock-section-header {
+            background: var(--bg) !important;
+        }
+
+        .swagger-ui .opblock {
+            background: var(--surface) !important;
+            border-color: var(--border) !important;
+            box-shadow: none !important;
+        }
+        .swagger-ui .opblock .opblock-summary {
+            border-color: var(--border) !important;
+        }
+        .swagger-ui .opblock-body,
+        .swagger-ui .opblock .opblock-section-header {
+            background: var(--surface) !important;
+        }
+
+        /* Text colors */
+        .swagger-ui,
+        .swagger-ui .opblock-tag,
+        .swagger-ui .opblock-tag small,
+        .swagger-ui .opblock .opblock-summary-description,
+        .swagger-ui .opblock-description-wrapper p,
+        .swagger-ui table thead tr td,
+        .swagger-ui table thead tr th,
+        .swagger-ui .parameter__name,
+        .swagger-ui .parameter__type,
+        .swagger-ui .response-col_status,
+        .swagger-ui .response-col_description,
+        .swagger-ui .model-title,
+        .swagger-ui .model,
+        .swagger-ui section.models h4,
+        .swagger-ui .markdown p,
+        .swagger-ui .markdown li,
+        .swagger-ui label,
+        .swagger-ui .btn {
+            color: var(--text) !important;
+        }
+
+        .swagger-ui .opblock .opblock-summary-operation-id,
+        .swagger-ui .opblock .opblock-summary-path,
+        .swagger-ui .opblock .opblock-summary-path__deprecated {
+            color: var(--text) !important;
+        }
+
+        /* Input/select styling */
+        .swagger-ui input[type=text],
+        .swagger-ui textarea,
+        .swagger-ui select {
+            background: var(--bg) !important;
+            color: var(--text) !important;
+            border-color: var(--border) !important;
+        }
+
+        /* Code blocks */
+        .swagger-ui .highlight-code,
+        .swagger-ui .example,
+        .swagger-ui .microlight {
+            background: var(--bg) !important;
+            color: var(--green) !important;
+            border-radius: 4px;
+        }
+
+        /* Responses */
+        .swagger-ui .responses-inner {
+            background: var(--surface) !important;
+        }
+        .swagger-ui .response {
+            background: var(--surface) !important;
+        }
+
+        /* Models section */
+        .swagger-ui section.models {
+            border-color: var(--border) !important;
+        }
+        .swagger-ui section.models .model-container {
+            border-color: var(--border) !important;
+        }
+
+        /* HTTP method colors — keep the originals but darken backgrounds */
+        .swagger-ui .opblock.opblock-get {
+            border-color: #49cc90 !important;
+            background: rgba(73,204,144,.08) !important;
+        }
+        .swagger-ui .opblock.opblock-get .opblock-summary {
+            border-color: rgba(73,204,144,.2) !important;
+        }
+        .swagger-ui .opblock.opblock-post {
+            border-color: #61affe !important;
+            background: rgba(97,175,254,.08) !important;
+        }
+        .swagger-ui .opblock.opblock-post .opblock-summary {
+            border-color: rgba(97,175,254,.2) !important;
+        }
+
+        /* Authorize button */
+        .swagger-ui .btn.authorize {
+            border-color: var(--accent) !important;
+            color: var(--accent) !important;
+        }
+        .swagger-ui .btn.authorize svg { fill: var(--accent) !important; }
+
+        /* Execute button */
+        .swagger-ui .btn.execute {
+            background: var(--accent) !important;
+            border-color: var(--accent) !important;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1><span>Site Selection IQ</span> &mdash; API Explorer</h1>
+        <div class="links">
+            <a href="/static/index.html">Demo Console</a>
+            <a href="/static/swagger.html" class="active">API Explorer</a>
+            <a href="/openapi.yaml" target="_blank">OpenAPI Spec ↗</a>
+        </div>
+    </div>
+
+    <div class="auth-helper">
+        <div>
+            <label>Quick Auth</label>
+        </div>
+        <select id="swagger-tenant">
+            <option value="550e8400-e29b-41d4-a716-446655440000">Acme Logistics</option>
+            <option value="660e8400-e29b-41d4-a716-446655440000">Globex Distribution</option>
+        </select>
+        <select id="swagger-role">
+            <option value="admin">admin</option>
+            <option value="analyst">analyst</option>
+            <option value="viewer">viewer</option>
+        </select>
+        <button onclick="quickAuth()">Get Token &amp; Authorize</button>
+        <span class="token-display" id="swagger-token-display">—</span>
+    </div>
+
+    <div id="swagger-ui"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.min.js"></script>
+    <script>
+        const ui = SwaggerUIBundle({
+            url: '/openapi.yaml',
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+            ],
+            plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+            ],
+            layout: 'StandaloneLayout',
+            defaultModelsExpandDepth: 1,
+            defaultModelExpandDepth: 2,
+            docExpansion: 'list',
+            tryItOutEnabled: true,
+            persistAuthorization: true,
+            requestInterceptor: (req) => {
+                // Auto-select localhost server for Try It Out
+                if (req.url && !req.url.startsWith('http://localhost') && !req.url.startsWith('/')) {
+                    req.url = req.url.replace(/https?:\/\/[^/]+/, '');
+                }
+                return req;
+            }
+        });
+
+        async function quickAuth() {
+            const tenantId = document.getElementById('swagger-tenant').value;
+            const role = document.getElementById('swagger-role').value;
+
+            try {
+                const res = await fetch('/dev/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tenant_id: tenantId,
+                        user_id: '00000000-0000-0000-0000-000000000001',
+                        role: role
+                    })
+                });
+                const data = await res.json();
+                const token = data.token;
+
+                // Show truncated token
+                document.getElementById('swagger-token-display').textContent =
+                    token.substring(0, 20) + '...' + token.substring(token.length - 10);
+
+                // Inject into Swagger UI authorize
+                ui.preauthorizeApiKey('BearerAuth', token);
+
+            } catch (e) {
+                document.getElementById('swagger-token-display').textContent = 'Error: ' + e.message;
+            }
+        }
+    </script>
+</body>
+</html>

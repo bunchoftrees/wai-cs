@@ -1,0 +1,8 @@
+bin/
+coverage.out
+coverage.html
+*.exe
+*.test
+*.prof
+.env
+/tmp/

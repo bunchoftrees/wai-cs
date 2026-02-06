@@ -1,0 +1,1212 @@
+openapi: 3.0.0
+info:
+  title: Site Selection IQ API
+  version: 1.0.0
+  description: |
+    Site Selection IQ API for strategic site selection and scoring.
+    Provides endpoints for uploading candidate sites, triggering scoring runs,
+    and retrieving recommendations with detailed explanations.
+  contact:
+    name: API Support
+    url: https://www.sitesselectioniq.com/support
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://api.siteselectioniq.com
+    description: Production server
+  - url: https://staging-api.siteselectioniq.com
+    description: Staging server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the API service. No authentication required.
+      operationId: healthCheck
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok, degraded, down]
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2024-01-15T10:30:00Z'
+                  version:
+                    type: string
+                    example: '1.0.0'
+                required:
+                  - status
+                  - timestamp
+        '503':
+          description: Service is unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [down]
+                    example: down
+                  timestamp:
+                    type: string
+                    format: date-time
+                  error:
+                    type: string
+                    example: Database connection failed
+
+  /dev/token:
+    post:
+      summary: Generate development JWT token
+      description: |
+        Generate a development JWT token for testing purposes.
+        No authentication required. For development and testing only.
+      operationId: generateDevToken
+      tags:
+        - Development
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DevTokenRequest'
+      responses:
+        '200':
+          description: Token generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevTokenResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/uploads:
+    post:
+      summary: Upload CSV file
+      description: |
+        Upload a CSV file containing candidate sites for scoring.
+        Returns an upload_id for subsequent operations.
+        Supports idempotent uploads via Idempotency-Key header.
+      operationId: uploadCSV
+      tags:
+        - Uploads
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Unique identifier for idempotent uploads. Same key returns same result without reprocessing.
+          schema:
+            type: string
+            format: uuid
+            example: '550e8400-e29b-41d4-a716-446655440000'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV file containing site data. Required columns depend on scoring configuration.
+              required:
+                - file
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '201':
+          description: File created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+        '400':
+          description: Bad request - invalid file format or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '413':
+          description: Payload too large - file exceeds maximum size
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/uploads/{upload_id}/runs:
+    post:
+      summary: Trigger scoring run
+      description: |
+        Trigger a new scoring run for the uploaded CSV file.
+        The scoring_config specifies which factors and weights to use for ranking.
+        Supports idempotent operations via idempotency_key in request body.
+      operationId: triggerScoringRun
+      tags:
+        - Scoring Runs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          description: The unique identifier of the uploaded file
+          schema:
+            type: string
+            format: uuid
+            example: '550e8400-e29b-41d4-a716-446655440000'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoringRunRequest'
+      responses:
+        '200':
+          description: Scoring run created or retrieved (idempotent)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoringRunResponse'
+        '201':
+          description: Scoring run created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoringRunResponse'
+        '400':
+          description: Bad request - invalid scoring configuration or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized - invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Upload not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/runs/{run_id}:
+    get:
+      summary: Get run status
+      description: |
+        Retrieve the current status of a scoring run.
+        Status can be: pending, processing, completed, or failed.
+      operationId: getRunStatus
+      tags:
+        - Scoring Runs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          description: The unique identifier of the scoring run
+          schema:
+            type: string
+            format: uuid
+            example: '550e8400-e29b-41d4-a716-446655440000'
+      responses:
+        '200':
+          description: Run status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunStatusResponse'
+        '401':
+          description: Unauthorized - invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/runs/{run_id}/recommendations:
+    get:
+      summary: Get ranked recommendations
+      description: |
+        Retrieve ranked site recommendations from a completed scoring run.
+        Supports pagination and filtering by minimum score threshold.
+      operationId: getRecommendations
+      tags:
+        - Recommendations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          description: The unique identifier of the scoring run
+          schema:
+            type: string
+            format: uuid
+            example: '550e8400-e29b-41d4-a716-446655440000'
+        - name: page
+          in: query
+          required: false
+          description: Page number for pagination (0-indexed)
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+        - name: page_size
+          in: query
+          required: false
+          description: Number of results per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+        - name: min_score
+          in: query
+          required: false
+          description: Minimum score threshold (0-100). Only returns recommendations meeting this threshold.
+          schema:
+            type: number
+            format: double
+            minimum: 0
+            maximum: 100
+            example: 70.0
+      responses:
+        '200':
+          description: Recommendations retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationsResponse'
+        '401':
+          description: Unauthorized - invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Run not found or run has not completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/runs/{run_id}/recommendations/{site_id}/explain:
+    get:
+      summary: Get detailed explanation for a site recommendation
+      description: |
+        Retrieve a detailed explanation of how a specific site was scored.
+        Includes factor-level breakdowns and optionally a narrative explanation.
+      operationId: explainRecommendation
+      tags:
+        - Recommendations
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          description: The unique identifier of the scoring run
+          schema:
+            type: string
+            format: uuid
+            example: '550e8400-e29b-41d4-a716-446655440000'
+        - name: site_id
+          in: path
+          required: true
+          description: The unique identifier of the site to explain
+          schema:
+            type: string
+            example: 'SITE-12345'
+        - name: include_narrative
+          in: query
+          required: false
+          description: Include AI-generated narrative explanation of the score
+          schema:
+            type: boolean
+            default: false
+            example: true
+      responses:
+        '200':
+          description: Explanation retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExplanationResponse'
+        '401':
+          description: Unauthorized - invalid or missing authentication token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Run not found or site not found in run results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token for API authentication. Use /dev/token endpoint to generate test tokens.
+
+  schemas:
+    # Standard Response Envelope Schemas
+    StandardResponse:
+      type: object
+      description: Standard response envelope with status, data, error, and metadata
+      properties:
+        status:
+          type: string
+          enum: [success, error]
+          description: Overall status of the request
+          example: success
+        data:
+          type: object
+          description: Response payload (structure depends on endpoint)
+          nullable: true
+        error:
+          $ref: '#/components/schemas/ErrorDetails'
+        meta:
+          $ref: '#/components/schemas/ResponseMetadata'
+      required:
+        - status
+        - meta
+
+    ErrorDetails:
+      type: object
+      description: Error information in standard response envelope
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code
+          example: INVALID_FILE_FORMAT
+        message:
+          type: string
+          description: Human-readable error message
+          example: The uploaded file is not a valid CSV
+        details:
+          type: object
+          description: Additional error context and details
+          additionalProperties: true
+          nullable: true
+          example:
+            line: 15
+            column: 3
+            expected_columns:
+              - site_id
+              - location
+              - population
+      required:
+        - code
+        - message
+
+    ResponseMetadata:
+      type: object
+      description: Metadata included in all responses
+      properties:
+        correlation_id:
+          type: string
+          format: uuid
+          description: Unique identifier for request tracing
+          example: '550e8400-e29b-41d4-a716-446655440000'
+        timestamp:
+          type: string
+          format: date-time
+          description: Server timestamp when response was generated
+          example: '2024-01-15T10:30:45.123Z'
+      required:
+        - correlation_id
+        - timestamp
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+      description: Error response following standard envelope format
+
+    # Development Token Schemas
+    DevTokenRequest:
+      type: object
+      description: Request to generate a development JWT token
+      properties:
+        tenant_id:
+          type: string
+          description: Tenant identifier
+          example: 'tenant-123'
+        user_id:
+          type: string
+          description: User identifier
+          example: 'user-456'
+        role:
+          type: string
+          enum: [admin, analyst, viewer]
+          description: User role for authorization
+          example: analyst
+      required:
+        - tenant_id
+        - user_id
+        - role
+
+    DevTokenResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+      properties:
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: JWT bearer token for API authentication
+              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+            expires_in:
+              type: integer
+              description: Token expiration time in seconds
+              example: 3600
+            token_type:
+              type: string
+              enum: [Bearer]
+              example: Bearer
+          required:
+            - token
+            - expires_in
+            - token_type
+
+    # Upload Schemas
+    UploadResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+      properties:
+        data:
+          type: object
+          properties:
+            upload_id:
+              type: string
+              format: uuid
+              description: Unique identifier for the uploaded file
+              example: '550e8400-e29b-41d4-a716-446655440000'
+            filename:
+              type: string
+              description: Original filename of the uploaded file
+              example: 'candidate_sites.csv'
+            file_size:
+              type: integer
+              description: Size of uploaded file in bytes
+              example: 102400
+            row_count:
+              type: integer
+              description: Number of data rows in CSV (excluding header)
+              example: 250
+            columns:
+              type: array
+              description: Detected column names from CSV header
+              items:
+                type: string
+              example:
+                - site_id
+                - location
+                - population
+                - median_income
+            created_at:
+              type: string
+              format: date-time
+              description: Timestamp when file was uploaded
+              example: '2024-01-15T10:15:30.000Z'
+            status:
+              type: string
+              enum: [uploaded, validated, processing, ready]
+              description: Current processing status of the upload
+              example: ready
+          required:
+            - upload_id
+            - filename
+            - file_size
+            - row_count
+            - columns
+            - created_at
+            - status
+
+    # Scoring Run Schemas
+    ScoringRunRequest:
+      type: object
+      description: Request to trigger a new scoring run
+      properties:
+        idempotency_key:
+          type: string
+          format: uuid
+          description: Unique key for idempotent operations. Same key returns same run without reprocessing.
+          example: '550e8400-e29b-41d4-a716-446655440001'
+        scoring_config:
+          $ref: '#/components/schemas/ScoringConfig'
+      required:
+        - idempotency_key
+        - scoring_config
+
+    ScoringConfig:
+      type: object
+      description: Configuration for scoring run specifying factors and weights
+      properties:
+        name:
+          type: string
+          description: Name of this scoring configuration
+          example: Strategic Growth Markets
+        description:
+          type: string
+          description: Description of scoring objectives
+          example: Focuses on demographic growth and economic vitality
+        factors:
+          type: array
+          description: List of scoring factors with weights
+          items:
+            $ref: '#/components/schemas/ScoringFactor'
+          minItems: 1
+        constraints:
+          type: array
+          description: Optional constraints to filter sites
+          items:
+            $ref: '#/components/schemas/ScoringConstraint'
+          nullable: true
+      required:
+        - name
+        - factors
+
+    ScoringFactor:
+      type: object
+      description: Individual factor used in scoring calculation
+      properties:
+        factor_id:
+          type: string
+          description: Unique identifier for the factor
+          example: POPULATION_GROWTH
+        name:
+          type: string
+          description: Human-readable factor name
+          example: Population Growth Rate
+        weight:
+          type: number
+          format: double
+          description: Weight of this factor in overall score (0-1)
+          minimum: 0
+          maximum: 1
+          example: 0.25
+        data_column:
+          type: string
+          description: Column name in CSV corresponding to this factor
+          example: population_growth_rate
+        aggregation_method:
+          type: string
+          enum: [raw, percentile, zscore, custom]
+          description: Method for converting raw data to score
+          example: percentile
+      required:
+        - factor_id
+        - name
+        - weight
+        - data_column
+
+    ScoringConstraint:
+      type: object
+      description: Optional constraint to filter sites during scoring
+      properties:
+        constraint_id:
+          type: string
+          description: Unique identifier for the constraint
+          example: MIN_POPULATION
+        field:
+          type: string
+          description: CSV column to apply constraint to
+          example: population
+        operator:
+          type: string
+          enum: [eq, ne, gt, gte, lt, lte, in, contains]
+          description: Comparison operator
+          example: gte
+        value:
+          description: Value to compare against
+          example: 50000
+      required:
+        - constraint_id
+        - field
+        - operator
+        - value
+
+    ScoringRunResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+      properties:
+        data:
+          type: object
+          properties:
+            run_id:
+              type: string
+              format: uuid
+              description: Unique identifier for the scoring run
+              example: '550e8400-e29b-41d4-a716-446655440002'
+            upload_id:
+              type: string
+              format: uuid
+              description: Reference to the uploaded file
+              example: '550e8400-e29b-41d4-a716-446655440000'
+            status:
+              type: string
+              enum: [pending, processing, completed, failed]
+              description: Current status of the scoring run
+              example: processing
+            scoring_config:
+              $ref: '#/components/schemas/ScoringConfig'
+            created_at:
+              type: string
+              format: date-time
+              description: Timestamp when run was created
+              example: '2024-01-15T10:20:00.000Z'
+            started_at:
+              type: string
+              format: date-time
+              description: Timestamp when scoring began processing
+              example: '2024-01-15T10:20:05.000Z'
+              nullable: true
+            completed_at:
+              type: string
+              format: date-time
+              description: Timestamp when scoring completed
+              example: '2024-01-15T10:22:30.000Z'
+              nullable: true
+            progress_percent:
+              type: integer
+              description: Scoring progress percentage (0-100)
+              minimum: 0
+              maximum: 100
+              example: 75
+              nullable: true
+          required:
+            - run_id
+            - upload_id
+            - status
+            - scoring_config
+            - created_at
+
+    # Run Status Schemas
+    RunStatusResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+      properties:
+        data:
+          type: object
+          properties:
+            run_id:
+              type: string
+              format: uuid
+              description: Unique identifier for the scoring run
+              example: '550e8400-e29b-41d4-a716-446655440002'
+            status:
+              type: string
+              enum: [pending, processing, completed, failed]
+              description: Current status of the run
+              example: completed
+            progress_percent:
+              type: integer
+              description: Progress percentage (0-100)
+              minimum: 0
+              maximum: 100
+              example: 100
+            total_sites:
+              type: integer
+              description: Total number of sites in scoring run
+              example: 250
+            sites_scored:
+              type: integer
+              description: Number of sites successfully scored
+              example: 248
+            sites_failed:
+              type: integer
+              description: Number of sites that failed scoring
+              example: 2
+            created_at:
+              type: string
+              format: date-time
+              description: Timestamp when run was created
+              example: '2024-01-15T10:20:00.000Z'
+            started_at:
+              type: string
+              format: date-time
+              description: Timestamp when scoring began
+              example: '2024-01-15T10:20:05.000Z'
+              nullable: true
+            completed_at:
+              type: string
+              format: date-time
+              description: Timestamp when scoring completed
+              example: '2024-01-15T10:22:30.000Z'
+              nullable: true
+            estimated_completion:
+              type: string
+              format: date-time
+              description: Estimated completion time (if still processing)
+              example: '2024-01-15T10:25:00.000Z'
+              nullable: true
+            error:
+              $ref: '#/components/schemas/RunError'
+              nullable: true
+          required:
+            - run_id
+            - status
+            - progress_percent
+            - total_sites
+            - sites_scored
+            - sites_failed
+            - created_at
+
+    RunError:
+      type: object
+      description: Error information for failed run
+      properties:
+        code:
+          type: string
+          description: Error code
+          example: INVALID_DATA_FORMAT
+        message:
+          type: string
+          description: Human-readable error message
+          example: Invalid numeric value in column population
+        affected_rows:
+          type: array
+          description: Row indices that caused the error
+          items:
+            type: integer
+          example: [15, 32, 48]
+      required:
+        - code
+        - message
+
+    # Recommendations Schemas
+    RecommendationsResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+      properties:
+        data:
+          type: object
+          properties:
+            run_id:
+              type: string
+              format: uuid
+              description: Reference to the scoring run
+              example: '550e8400-e29b-41d4-a716-446655440002'
+            recommendations:
+              type: array
+              description: Ranked list of site recommendations
+              items:
+                $ref: '#/components/schemas/Recommendation'
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+            summary:
+              $ref: '#/components/schemas/RecommendationsSummary'
+          required:
+            - run_id
+            - recommendations
+            - pagination
+            - summary
+
+    Recommendation:
+      type: object
+      description: A single site recommendation with score and ranking
+      properties:
+        rank:
+          type: integer
+          description: Rank position among all recommendations (1-based)
+          minimum: 1
+          example: 1
+        site_id:
+          type: string
+          description: Unique identifier for the site
+          example: SITE-12345
+        site_name:
+          type: string
+          description: Human-readable name of the site
+          example: Downtown District - Phoenix, AZ
+        overall_score:
+          type: number
+          format: double
+          description: Overall site score (0-100)
+          minimum: 0
+          maximum: 100
+          example: 87.5
+        factor_scores:
+          type: object
+          description: Scores for individual factors
+          additionalProperties:
+            type: number
+            format: double
+            minimum: 0
+            maximum: 100
+          example:
+            POPULATION_GROWTH: 92.0
+            MEDIAN_INCOME: 75.5
+            MARKET_ACCESSIBILITY: 88.0
+        percentile_rank:
+          type: number
+          format: double
+          description: Percentile ranking among all sites (0-100)
+          minimum: 0
+          maximum: 100
+          example: 95.2
+        attributes:
+          type: object
+          description: Original attributes from CSV for this site
+          additionalProperties: true
+          example:
+            location: Phoenix, AZ
+            population: 1500000
+            median_income: 65000
+      required:
+        - rank
+        - site_id
+        - site_name
+        - overall_score
+        - factor_scores
+        - percentile_rank
+
+    Pagination:
+      type: object
+      description: Pagination metadata for result set
+      properties:
+        page:
+          type: integer
+          description: Current page number (0-indexed)
+          minimum: 0
+          example: 0
+        page_size:
+          type: integer
+          description: Number of results per page
+          minimum: 1
+          example: 20
+        total_results:
+          type: integer
+          description: Total number of recommendations across all pages
+          minimum: 0
+          example: 248
+        total_pages:
+          type: integer
+          description: Total number of pages
+          minimum: 0
+          example: 13
+        has_more:
+          type: boolean
+          description: Whether more pages are available
+          example: true
+      required:
+        - page
+        - page_size
+        - total_results
+        - total_pages
+        - has_more
+
+    RecommendationsSummary:
+      type: object
+      description: Summary statistics for the recommendations
+      properties:
+        total_recommendations:
+          type: integer
+          description: Total number of recommendations
+          example: 248
+        filtered_recommendations:
+          type: integer
+          description: Number of recommendations after filtering (e.g., min_score)
+          example: 180
+        average_score:
+          type: number
+          format: double
+          description: Average score across all recommendations
+          example: 72.3
+        median_score:
+          type: number
+          format: double
+          description: Median score across all recommendations
+          example: 71.5
+        max_score:
+          type: number
+          format: double
+          description: Highest score among recommendations
+          example: 95.2
+        min_score:
+          type: number
+          format: double
+          description: Lowest score among recommendations
+          example: 45.1
+      required:
+        - total_recommendations
+        - filtered_recommendations
+        - average_score
+        - median_score
+        - max_score
+        - min_score
+
+    # Explanation Schemas
+    ExplanationResponse:
+      allOf:
+        - $ref: '#/components/schemas/StandardResponse'
+      properties:
+        data:
+          type: object
+          properties:
+            run_id:
+              type: string
+              format: uuid
+              description: Reference to the scoring run
+              example: '550e8400-e29b-41d4-a716-446655440002'
+            site_id:
+              type: string
+              description: The site being explained
+              example: SITE-12345
+            site_name:
+              type: string
+              description: Human-readable site name
+              example: Downtown District - Phoenix, AZ
+            overall_score:
+              type: number
+              format: double
+              description: Overall score for this site
+              minimum: 0
+              maximum: 100
+              example: 87.5
+            rank:
+              type: integer
+              description: Rank position among all sites
+              minimum: 1
+              example: 1
+            percentile_rank:
+              type: number
+              format: double
+              description: Percentile ranking (0-100)
+              minimum: 0
+              maximum: 100
+              example: 95.2
+            factor_explanations:
+              type: array
+              description: Detailed breakdown of each factor contribution
+              items:
+                $ref: '#/components/schemas/FactorExplanation'
+            narrative:
+              type: string
+              description: AI-generated narrative explanation of the score (optional)
+              nullable: true
+              example: |
+                This site scored exceptionally high primarily due to strong population
+                growth metrics and excellent market accessibility. The median income
+                score was moderate, which slightly pulled down the overall score.
+                Compared to other sites, this location represents a top-tier opportunity.
+            comparables:
+              type: array
+              description: Comparison to similar-ranked sites
+              items:
+                $ref: '#/components/schemas/ComparableSite'
+              nullable: true
+          required:
+            - run_id
+            - site_id
+            - site_name
+            - overall_score
+            - rank
+            - percentile_rank
+            - factor_explanations
+
+    FactorExplanation:
+      type: object
+      description: Detailed explanation of a single factor's contribution to the score
+      properties:
+        factor_id:
+          type: string
+          description: Unique identifier for the factor
+          example: POPULATION_GROWTH
+        factor_name:
+          type: string
+          description: Human-readable factor name
+          example: Population Growth Rate
+        raw_value:
+          type: number
+          format: double
+          description: Original raw value from CSV
+          example: 3.5
+        normalized_score:
+          type: number
+          format: double
+          description: Normalized score (0-100)
+          minimum: 0
+          maximum: 100
+          example: 92.0
+        weight:
+          type: number
+          format: double
+          description: Weight applied to this factor
+          minimum: 0
+          maximum: 1
+          example: 0.25
+        contribution:
+          type: number
+          format: double
+          description: Weighted contribution to overall score
+          example: 23.0
+        percentile:
+          type: number
+          format: double
+          description: Percentile rank for this factor among all sites
+          minimum: 0
+          maximum: 100
+          example: 96.5
+        benchmark:
+          type: object
+          description: Comparison to benchmarks
+          properties:
+            average:
+              type: number
+              format: double
+              example: 2.1
+            median:
+              type: number
+              format: double
+              example: 2.0
+            top_quartile:
+              type: number
+              format: double
+              example: 3.2
+          nullable: true
+        assessment:
+          type: string
+          description: Qualitative assessment of this factor
+          enum: [excellent, good, average, poor, below_average]
+          example: excellent
+      required:
+        - factor_id
+        - factor_name
+        - raw_value
+        - normalized_score
+        - weight
+        - contribution
+        - percentile
+        - assessment
+
+    ComparableSite:
+      type: object
+      description: Comparable site for context
+      properties:
+        site_id:
+          type: string
+          description: Site identifier
+          example: SITE-99999
+        site_name:
+          type: string
+          description: Site name
+          example: Midtown District - Denver, CO
+        rank:
+          type: integer
+          description: Rank of comparable site
+          example: 2
+        overall_score:
+          type: number
+          format: double
+          description: Overall score
+          example: 85.2
+        score_difference:
+          type: number
+          format: double
+          description: Score difference vs reference site (negative means lower)
+          example: 2.3
+      required:
+        - site_id
+        - site_name
+        - rank
+        - overall_score
+        - score_difference
+
+tags:
+  - name: Health
+    description: Service health and status endpoints
+  - name: Development
+    description: Development and testing utilities
+  - name: Uploads
+    description: File upload operations
+  - name: Scoring Runs
+    description: Scoring run management and status
+  - name: Recommendations
+    description: Site recommendations and explanations

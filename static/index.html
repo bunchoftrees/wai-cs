@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site Selection IQ — Demo Console</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #242836;
+            --border: #2e3345;
+            --text: #e1e4ed;
+            --text-dim: #8b8fa3;
+            --accent: #6c7cff;
+            --accent-glow: rgba(108,124,255,.15);
+            --green: #34d399;
+            --yellow: #fbbf24;
+            --red: #f87171;
+            --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: -.01em;
+        }
+        header h1 span { color: var(--accent); }
+        .token-bar {
+            display: flex;
+            align-items: center;
+            gap: .75rem;
+            font-size: .8rem;
+        }
+        .token-bar label { color: var(--text-dim); }
+        .token-bar .badge {
+            background: var(--accent-glow);
+            color: var(--accent);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: .75rem;
+        }
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Steps */
+        .pipeline {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .step-tab {
+            flex: 1;
+            padding: .75rem 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            font-size: .85rem;
+            font-weight: 500;
+            transition: all .15s;
+            position: relative;
+        }
+        .step-tab:hover { border-color: var(--accent); }
+        .step-tab.active {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+        .step-tab .num {
+            display: inline-block;
+            width: 22px; height: 22px;
+            line-height: 22px;
+            border-radius: 50%;
+            background: var(--surface2);
+            font-size: .75rem;
+            margin-right: .4rem;
+        }
+        .step-tab.active .num { background: var(--accent); color: #fff; }
+        .step-tab.done .num { background: var(--green); color: #fff; }
+
+        .panel {
+            display: none;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+        .panel.active { display: block; }
+        .panel h2 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        /* Forms */
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 2.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all .2s;
+            margin-bottom: 1rem;
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+        .drop-zone p { color: var(--text-dim); font-size: .9rem; }
+        .drop-zone .filename {
+            color: var(--green);
+            font-family: var(--mono);
+            font-size: .85rem;
+            margin-top: .5rem;
+        }
+        input[type="file"] { display: none; }
+        input[type="text"], select {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: .5rem .75rem;
+            border-radius: 6px;
+            font-size: .85rem;
+            width: 100%;
+        }
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .form-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            align-items: end;
+        }
+        .form-row > div { flex: 1; }
+        .form-row label {
+            display: block;
+            font-size: .75rem;
+            color: var(--text-dim);
+            margin-bottom: .3rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        /* Buttons */
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: .6rem 1.5rem;
+            border-radius: 6px;
+            font-size: .85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: opacity .15s;
+        }
+        .btn:hover { opacity: .9; }
+        .btn:disabled { opacity: .4; cursor: not-allowed; }
+        .btn-secondary {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+        }
+
+        /* Output */
+        .output {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: var(--mono);
+            font-size: .8rem;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+        .output:empty { display: none; }
+
+        /* Status pills */
+        .status {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: .75rem;
+            font-weight: 500;
+        }
+        .status-queued { background: rgba(251,191,36,.15); color: var(--yellow); }
+        .status-running { background: rgba(108,124,255,.15); color: var(--accent); }
+        .status-succeeded { background: rgba(52,211,153,.15); color: var(--green); }
+        .status-failed { background: rgba(248,113,113,.15); color: var(--red); }
+
+        /* Recommendations table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .85rem;
+        }
+        th {
+            text-align: left;
+            font-size: .7rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            padding: .5rem .75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        td {
+            padding: .6rem .75rem;
+            border-bottom: 1px solid var(--border);
+        }
+        tr:hover td { background: var(--surface2); }
+        .table-wrap {
+            overflow-x: auto;
+            margin: 0 -.5rem;
+            padding: 0 .5rem;
+        }
+        table { min-width: 100%; border-collapse: separate; border-spacing: 0; }
+        td, th { white-space: nowrap; }
+
+        /* Sticky columns: left pins (rank, site id) and right pins (score, explain) */
+        .pin-l, .pin-r {
+            position: sticky;
+            z-index: 2;
+            background: var(--surface);
+        }
+        thead .pin-l, thead .pin-r { z-index: 3; background: var(--surface); }
+        tr:hover .pin-l, tr:hover .pin-r { background: var(--surface2); }
+        .pin-l-0 { left: 0; }
+        .pin-l-1 { left: 52px; }
+        .pin-r-1 { right: 0; }
+        .pin-r-0 { right: 72px; }
+        /* Subtle edge shadow to hint at scrollable content */
+        .pin-l-1::after, .pin-r-0::before {
+            content: '';
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 6px;
+            pointer-events: none;
+        }
+        .pin-l-1::after { right: -6px; background: linear-gradient(to right, rgba(0,0,0,.15), transparent); }
+        .pin-r-0::before { left: -6px; background: linear-gradient(to left, rgba(0,0,0,.15), transparent); }
+
+        .col-value {
+            font-family: var(--mono);
+            font-size: .8rem;
+            text-align: right;
+        }
+        .score-bar {
+            display: inline-block;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--accent);
+            vertical-align: middle;
+            margin-right: .5rem;
+        }
+        .explain-link {
+            color: var(--accent);
+            cursor: pointer;
+            text-decoration: none;
+            font-size: .8rem;
+        }
+        .explain-link:hover { text-decoration: underline; }
+
+        /* Spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px; height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .6s linear infinite;
+            vertical-align: middle;
+            margin-right: .5rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Info cards shown after upload/run */
+        .info-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: .75rem 1rem;
+            margin-top: .75rem;
+            font-size: .82rem;
+            display: none;
+        }
+        .info-card.visible { display: block; }
+        .info-card .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: .2rem 0;
+        }
+        .info-card .info-label {
+            color: var(--text-dim);
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+        }
+        .info-card .info-value {
+            font-family: var(--mono);
+            font-size: .8rem;
+        }
+        .info-card .info-value.ok { color: var(--green); }
+        .info-card .info-value.warn { color: #fbbf24; }
+        .info-card .info-value.err { color: var(--red); }
+        .info-card .info-value.dup { color: var(--accent); }
+        .warning-list {
+            margin-top: .4rem;
+            padding: .4rem .6rem;
+            background: rgba(251,191,36,.08);
+            border: 1px solid rgba(251,191,36,.2);
+            border-radius: 4px;
+            font-size: .75rem;
+            color: #fbbf24;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .warning-list div { padding: 1px 0; }
+        .warning-list div::before { content: '⚠ '; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.6);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal h3 { margin-bottom: 1rem; font-size: 1rem; }
+        .modal .close {
+            float: right;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+        .factor-row {
+            display: flex;
+            align-items: center;
+            padding: .4rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: .85rem;
+        }
+        .factor-name { flex: 1; font-weight: 500; }
+        .factor-value { width: 60px; text-align: right; color: var(--text-dim); }
+        .factor-weight { width: 60px; text-align: right; font-family: var(--mono); font-size: .8rem; }
+        .factor-contrib {
+            width: 70px;
+            text-align: right;
+            font-family: var(--mono);
+            font-size: .8rem;
+            font-weight: 600;
+        }
+        .contrib-positive { color: var(--green); }
+        .contrib-negative { color: var(--red); }
+    </style>
+</head>
+<body>
+    <header>
+        <h1><span>Site Selection IQ</span> &mdash; Demo Console</h1>
+        <div class="token-bar">
+            <label>Tenant:</label>
+            <select id="tenantSelect" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:2px 8px;border-radius:4px;font-size:.78rem;">
+                <option value="550e8400-e29b-41d4-a716-446655440000">Acme Logistics</option>
+                <option value="660e8400-e29b-41d4-a716-446655440000">Globex Distribution</option>
+            </select>
+            <label>JWT:</label>
+            <span class="badge" id="token-status">not authenticated</span>
+            <button class="btn btn-secondary" onclick="authenticate()" style="padding:.35rem .75rem; font-size:.78rem;">Get Token</button>
+            <a href="/docs" style="color:var(--text-dim);font-size:.78rem;text-decoration:none;border:1px solid var(--border);padding:2px 8px;border-radius:4px;">API Explorer</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="pipeline">
+            <div class="step-tab active" data-step="1" onclick="showStep(1)">
+                <span class="num">1</span> Upload CSV
+            </div>
+            <div class="step-tab" data-step="2" onclick="showStep(2)">
+                <span class="num">2</span> Score
+            </div>
+            <div class="step-tab" data-step="3" onclick="showStep(3)">
+                <span class="num">3</span> Results
+            </div>
+        </div>
+
+        <!-- Step 1: Upload -->
+        <div class="panel active" id="panel-1">
+            <h2>Upload Site Data</h2>
+            <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                <p>Drop a CSV file here, or click to browse</p>
+                <div class="filename" id="selectedFile"></div>
+            </div>
+            <input type="file" id="fileInput" accept=".csv" onchange="handleFile(this)">
+            <div class="form-row">
+                <div>
+                    <label>Idempotency Key (optional)</label>
+                    <input type="text" id="uploadIdemKey" placeholder="client-generated-uuid">
+                </div>
+            </div>
+            <button class="btn" id="uploadBtn" onclick="uploadFile()" disabled>Upload &amp; Validate</button>
+            <div class="info-card" id="uploadInfo">
+                <div class="info-row"><span class="info-label">Status</span><span class="info-value" id="uiValStatus"></span></div>
+                <div class="info-row"><span class="info-label">Upload ID</span><span class="info-value" id="uiUploadId"></span></div>
+                <div class="info-row"><span class="info-label">Rows</span><span class="info-value" id="uiRowCount"></span></div>
+                <div class="info-row"><span class="info-label">Schema</span><span class="info-value" id="uiSchema"></span></div>
+                <div class="info-row"><span class="info-label">Content Hash</span><span class="info-value" id="uiHash"></span></div>
+                <div id="uiWarnings"></div>
+            </div>
+            <div class="output" id="uploadOutput" style="display:none;"></div>
+        </div>
+
+        <!-- Step 2: Score -->
+        <div class="panel" id="panel-2">
+            <h2>Trigger Scoring Run</h2>
+            <div class="form-row">
+                <div>
+                    <label>Upload ID</label>
+                    <input type="text" id="runUploadId" placeholder="auto-filled after upload">
+                </div>
+                <div>
+                    <label>Model Version</label>
+                    <select id="modelVersion">
+                        <option value="latest">latest</option>
+                        <option value="site-selection-iq-v1.0">site-selection-iq-v1.0</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" id="runBtn" onclick="triggerRun()">Start Scoring Run</button>
+            <div class="info-card" id="runInfo">
+                <div class="info-row"><span class="info-label">Status</span><span class="info-value" id="riStatus"></span></div>
+                <div class="info-row"><span class="info-label">Run ID</span><span class="info-value" id="riRunId"></span></div>
+                <div class="info-row"><span class="info-label">Model</span><span class="info-value" id="riModel"></span></div>
+                <div class="info-row"><span class="info-label">Rows Scored</span><span class="info-value" id="riScored"></span></div>
+                <div class="info-row"><span class="info-label">Duration</span><span class="info-value" id="riDuration"></span></div>
+                <div class="info-row"><span class="info-label">Attempt</span><span class="info-value" id="riAttempt"></span></div>
+            </div>
+            <div class="output" id="runOutput" style="display:none;"></div>
+        </div>
+
+        <!-- Step 3: Results -->
+        <div class="panel" id="panel-3">
+            <h2>Recommendations</h2>
+            <div class="form-row">
+                <div>
+                    <label>Run ID</label>
+                    <input type="text" id="recRunId" placeholder="auto-filled after scoring">
+                </div>
+                <div>
+                    <label>Min Score</label>
+                    <input type="text" id="minScore" placeholder="0">
+                </div>
+                <div style="flex:0;">
+                    <label>&nbsp;</label>
+                    <button class="btn" onclick="fetchRecommendations()">Load</button>
+                </div>
+            </div>
+            <div id="recTable"></div>
+            <div class="output" id="recOutput"></div>
+        </div>
+    </main>
+
+    <!-- Explanation Modal -->
+    <div class="modal-overlay" id="explainModal">
+        <div class="modal">
+            <button class="close" onclick="closeModal()">&times;</button>
+            <h3 id="modalTitle">Site Explanation</h3>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+    const API = '';
+    let TOKEN = '';
+    let currentUploadId = '';
+    let currentRunId = '';
+
+    // --- Auth ---
+    async function authenticate() {
+        const tenantId = document.getElementById('tenantSelect').value;
+        try {
+            const res = await fetch(`${API}/dev/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tenant_id: tenantId,
+                    user_id: '00000000-0000-0000-0000-000000000001',
+                    role: 'admin'
+                })
+            });
+            const data = await res.json();
+            TOKEN = data.token;
+            const tenantName = document.getElementById('tenantSelect').selectedOptions[0].text;
+            document.getElementById('token-status').textContent = `${tenantName} ✓`;
+            document.getElementById('token-status').style.color = 'var(--green)';
+        } catch (e) {
+            alert('Failed to get token. Is the API running?');
+        }
+    }
+
+    // Re-authenticate when tenant changes
+    document.getElementById('tenantSelect').addEventListener('change', () => {
+        TOKEN = '';
+        document.getElementById('token-status').textContent = 'not authenticated';
+        document.getElementById('token-status').style.color = '';
+        currentUploadId = '';
+        currentRunId = '';
+        authenticate();
+    });
+
+    function authHeaders(extra = {}) {
+        return { 'Authorization': `Bearer ${TOKEN}`, ...extra };
+    }
+
+    // Generate a UUID v4 for idempotency keys
+    function newIdemKey() {
+        return crypto.randomUUID ? crypto.randomUUID() :
+            'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+                const r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+    }
+
+    // --- Step navigation ---
+    function showStep(n) {
+        document.querySelectorAll('.step-tab').forEach(t => t.classList.toggle('active', +t.dataset.step === n));
+        document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === n - 1));
+    }
+    function markDone(n) {
+        document.querySelector(`.step-tab[data-step="${n}"]`).classList.add('done');
+    }
+
+    // --- Upload ---
+    let selectedFile = null;
+    const dropZone = document.getElementById('dropZone');
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+            selectedFile = e.dataTransfer.files[0];
+            document.getElementById('selectedFile').textContent = selectedFile.name;
+            document.getElementById('uploadBtn').disabled = false;
+            document.getElementById('uploadIdemKey').value = newIdemKey();
+        }
+    });
+
+    function handleFile(input) {
+        if (input.files.length) {
+            selectedFile = input.files[0];
+            document.getElementById('selectedFile').textContent = selectedFile.name;
+            document.getElementById('uploadBtn').disabled = false;
+            document.getElementById('uploadIdemKey').value = newIdemKey();
+        }
+    }
+
+    async function uploadFile() {
+        if (!TOKEN) { alert('Authenticate first!'); return; }
+        if (!selectedFile) return;
+
+        const btn = document.getElementById('uploadBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Uploading...';
+
+        const form = new FormData();
+        form.append('file', selectedFile);
+
+        const headers = authHeaders();
+        const idem = document.getElementById('uploadIdemKey').value || newIdemKey();
+        headers['Idempotency-Key'] = idem;
+
+        try {
+            const res = await fetch(`${API}/api/v1/uploads`, { method: 'POST', headers, body: form });
+            const json = await res.json();
+            const d = json.data || {};
+
+            if (d.upload_id) {
+                currentUploadId = d.upload_id;
+                document.getElementById('runUploadId').value = currentUploadId;
+
+                // Populate info card
+                const card = document.getElementById('uploadInfo');
+                card.classList.add('visible');
+
+                const isDup = d.duplicate === true;
+                const valStatus = d.validation_status || 'unknown';
+                const statusEl = document.getElementById('uiValStatus');
+                statusEl.textContent = isDup ? 'duplicate (reusing existing)' : valStatus;
+                statusEl.className = 'info-value ' + (isDup ? 'dup' : valStatus === 'valid' ? 'ok' : 'err');
+
+                document.getElementById('uiUploadId').textContent = d.upload_id;
+                document.getElementById('uiRowCount').textContent = d.row_count ?? '—';
+                document.getElementById('uiSchema').textContent = d.schema_version || '—';
+
+                const hash = d.content_hash || '';
+                document.getElementById('uiHash').textContent = hash ? hash.substring(0, 16) + '…' : '—';
+                document.getElementById('uiHash').title = hash;
+
+                // Show warnings if any
+                const warnings = d.validation_warnings || [];
+                const warnContainer = document.getElementById('uiWarnings');
+                if (warnings.length > 0) {
+                    let whtml = `<div class="warning-list">`;
+                    for (const w of warnings) whtml += `<div>${w}</div>`;
+                    whtml += `</div>`;
+                    warnContainer.innerHTML = whtml;
+                } else {
+                    warnContainer.innerHTML = '';
+                }
+
+                markDone(1);
+                showStep(2);
+            } else {
+                // Error response — show raw JSON
+                document.getElementById('uploadOutput').style.display = 'block';
+                document.getElementById('uploadOutput').textContent = JSON.stringify(json, null, 2);
+            }
+        } catch (e) {
+            document.getElementById('uploadOutput').style.display = 'block';
+            document.getElementById('uploadOutput').textContent = `Error: ${e.message}`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Upload & Validate';
+        }
+    }
+
+    // --- Scoring Run ---
+    async function triggerRun() {
+        if (!TOKEN) { alert('Authenticate first!'); return; }
+        const uploadId = document.getElementById('runUploadId').value;
+        if (!uploadId) { alert('No upload ID'); return; }
+
+        const btn = document.getElementById('runBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Starting...';
+
+        try {
+            const runIdemKey = newIdemKey();
+            const res = await fetch(`${API}/api/v1/uploads/${uploadId}/runs`, {
+                method: 'POST',
+                headers: authHeaders({ 'Content-Type': 'application/json', 'Idempotency-Key': runIdemKey }),
+                body: JSON.stringify({
+                    idempotency_key: runIdemKey,
+                    scoring_config: { model_version: document.getElementById('modelVersion').value }
+                })
+            });
+            const json = await res.json();
+
+            if (json.data && json.data.run_id) {
+                currentRunId = json.data.run_id;
+                document.getElementById('recRunId').value = currentRunId;
+                // Show the run info card immediately
+                document.getElementById('runInfo').classList.add('visible');
+                updateRunCard(json.data);
+                pollRunStatus(currentRunId);
+            } else {
+                document.getElementById('runOutput').style.display = 'block';
+                document.getElementById('runOutput').textContent = JSON.stringify(json, null, 2);
+                btn.disabled = false;
+                btn.textContent = 'Start Scoring Run';
+            }
+        } catch (e) {
+            document.getElementById('runOutput').style.display = 'block';
+            document.getElementById('runOutput').textContent = `Error: ${e.message}`;
+            btn.disabled = false;
+            btn.textContent = 'Start Scoring Run';
+        }
+    }
+
+    function updateRunCard(d) {
+        const statusEl = document.getElementById('riStatus');
+        const status = d.status || 'unknown';
+        statusEl.textContent = status;
+        statusEl.className = 'info-value ' + (status === 'succeeded' ? 'ok' : status === 'failed' ? 'err' : 'warn');
+
+        document.getElementById('riRunId').textContent = d.run_id || '—';
+        document.getElementById('riModel').textContent = d.model_version || '—';
+        document.getElementById('riScored').textContent =
+            (d.scored_count != null ? d.scored_count : '—') +
+            (d.row_count != null ? ` / ${d.row_count}` : '');
+        document.getElementById('riDuration').textContent = d.duration_ms != null ? `${d.duration_ms}ms` : '—';
+        document.getElementById('riAttempt').textContent = d.attempt != null ? d.attempt : '—';
+    }
+
+    async function pollRunStatus(runId) {
+        const btn = document.getElementById('runBtn');
+        let attempts = 0;
+
+        const poll = async () => {
+            try {
+                const res = await fetch(`${API}/api/v1/runs/${runId}`, { headers: authHeaders() });
+                const json = await res.json();
+                const d = json.data || {};
+                const status = d.status || 'unknown';
+
+                updateRunCard(d);
+
+                if (status === 'succeeded') {
+                    markDone(2);
+                    btn.disabled = false;
+                    btn.textContent = 'Start Scoring Run';
+                    showStep(3);
+                    fetchRecommendations();
+                    return;
+                }
+                if (status === 'failed') {
+                    btn.disabled = false;
+                    btn.textContent = 'Start Scoring Run';
+                    return;
+                }
+
+                attempts++;
+                setTimeout(poll, 1000);
+            } catch (e) {
+                document.getElementById('riStatus').textContent = `poll error`;
+                document.getElementById('riStatus').className = 'info-value err';
+                btn.disabled = false;
+                btn.textContent = 'Start Scoring Run';
+            }
+        };
+        poll();
+    }
+
+    // --- Recommendations ---
+    async function fetchRecommendations() {
+        if (!TOKEN) { alert('Authenticate first!'); return; }
+        const runId = document.getElementById('recRunId').value;
+        if (!runId) { alert('No run ID'); return; }
+
+        const minScore = document.getElementById('minScore').value;
+        let url = `${API}/api/v1/runs/${runId}/recommendations?page=1&page_size=50`;
+        if (minScore) url += `&min_score=${minScore}`;
+
+        try {
+            const res = await fetch(url, { headers: authHeaders() });
+            const json = await res.json();
+
+            const recs = json.data?.recommendations || [];
+            const pagination = json.data?.pagination || {};
+
+            if (recs.length === 0) {
+                document.getElementById('recTable').innerHTML = '<p style="color:var(--text-dim);padding:1rem;">No recommendations found.</p>';
+                document.getElementById('recOutput').textContent = JSON.stringify(json, null, 2);
+                return;
+            }
+
+            // Derive data columns dynamically from the first rec's explanation factors
+            const factors = recs[0]?.explanation?.factors || [];
+            const dataColumns = factors.map(f => f.name);
+
+            // Prettify column names: unemployment_rate → Unemployment Rate
+            const prettify = (s) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+            // Build table header: Rank | Site ID | <dynamic columns...> | Score | (explain)
+            let html = `<div class="table-wrap"><table><thead><tr>
+                <th class="pin-l pin-l-0">Rank</th>
+                <th class="pin-l pin-l-1">Site ID</th>`;
+            for (const col of dataColumns) {
+                html += `<th style="text-align:right;">${prettify(col)}</th>`;
+            }
+            html += `<th class="pin-r pin-r-0" style="text-align:right;">Score</th>
+                <th class="pin-r pin-r-1"></th>
+            </tr></thead><tbody>`;
+
+            // Build lookup from factors by name for each rec
+            for (const rec of recs) {
+                const score = rec.final_score?.toFixed?.(1) || rec.final_score || '—';
+                const barWidth = Math.min(Math.max((rec.final_score || 0), 0), 100);
+                const factorMap = {};
+                for (const f of (rec.explanation?.factors || [])) {
+                    factorMap[f.name] = f;
+                }
+
+                html += `<tr>
+                    <td class="pin-l pin-l-0" style="font-weight:600;color:var(--accent);">#${rec.rank}</td>
+                    <td class="pin-l pin-l-1" style="font-family:var(--mono);font-size:.8rem;">${rec.site_id}</td>`;
+
+                for (const col of dataColumns) {
+                    const f = factorMap[col];
+                    const val = f ? (Number.isInteger(f.value) ? f.value : f.value?.toFixed?.(1) ?? '—') : '—';
+                    // Color-code: green if contribution > 0, red if negative, dim if zero
+                    const color = f && f.contribution < 0 ? 'var(--red)' : (f && f.contribution > 0 ? 'var(--green)' : 'var(--text-dim)');
+                    html += `<td class="col-value" style="color:${color};">${val}</td>`;
+                }
+
+                html += `<td class="pin-r pin-r-0" style="text-align:right;"><span class="score-bar" style="width:${barWidth}px;"></span>${score}</td>
+                    <td class="pin-r pin-r-1"><a class="explain-link" onclick="showExplanation('${runId}','${rec.site_id}')">Explain →</a></td>
+                </tr>`;
+            }
+            html += `</tbody></table></div>`;
+            html += `<p style="margin-top:.75rem;font-size:.75rem;color:var(--text-dim);">
+                Page ${pagination.page || 1} of ${pagination.total_pages || 1} · ${pagination.total_results || recs.length} total
+                · ${dataColumns.length} scoring factors detected
+            </p>`;
+
+            document.getElementById('recTable').innerHTML = html;
+            document.getElementById('recOutput').textContent = '';
+            markDone(3);
+        } catch (e) {
+            document.getElementById('recOutput').textContent = `Error: ${e.message}`;
+        }
+    }
+
+    // --- Explanation Modal ---
+    async function showExplanation(runId, siteId) {
+        const modal = document.getElementById('explainModal');
+        modal.classList.add('active');
+        document.getElementById('modalTitle').textContent = `Explanation: ${siteId}`;
+        document.getElementById('modalContent').innerHTML = '<span class="spinner"></span> Loading...';
+
+        try {
+            const res = await fetch(
+                `${API}/api/v1/runs/${runId}/recommendations/${siteId}/explain?include_narrative=true`,
+                { headers: authHeaders() }
+            );
+            const json = await res.json();
+            const d = json.data || {};
+            const exp = d.explanation || {};
+            const factors = exp.factors || [];
+
+            let html = `
+                <div style="display:flex;gap:2rem;margin-bottom:1.5rem;">
+                    <div>
+                        <div style="font-size:.7rem;color:var(--text-dim);text-transform:uppercase;">Final Score</div>
+                        <div style="font-size:1.8rem;font-weight:700;color:var(--accent);">${d.final_score?.toFixed?.(1) || d.final_score || '—'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.7rem;color:var(--text-dim);text-transform:uppercase;">Raw Score</div>
+                        <div style="font-size:1.8rem;font-weight:700;">${d.raw_score?.toFixed?.(1) || d.raw_score || '—'}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:.7rem;color:var(--text-dim);text-transform:uppercase;">Model</div>
+                        <div style="font-size:.9rem;font-family:var(--mono);margin-top:.3rem;">${exp.model_version || '—'}</div>
+                    </div>
+                </div>
+            `;
+
+            if (factors.length) {
+                html += `<div style="margin-bottom:1rem;">
+                    <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.5rem;">Scoring Factors</div>`;
+                for (const f of factors) {
+                    const contrib = f.contribution || 0;
+                    const contribClass = contrib >= 0 ? 'contrib-positive' : 'contrib-negative';
+                    const sign = contrib >= 0 ? '+' : '';
+                    html += `<div class="factor-row">
+                        <div class="factor-name">${f.name}</div>
+                        <div class="factor-value">${f.value}</div>
+                        <div class="factor-weight">w: ${f.weight}</div>
+                        <div class="factor-contrib ${contribClass}">${sign}${contrib.toFixed?.(2) || contrib}</div>
+                    </div>`;
+                }
+                html += '</div>';
+            }
+
+            if (exp.summary) {
+                html += `<div style="background:var(--bg);border-radius:6px;padding:.75rem;margin-bottom:1rem;font-size:.85rem;color:var(--text-dim);">
+                    ${exp.summary}
+                </div>`;
+            }
+
+            if (d.narrative) {
+                html += `<div style="margin-top:1rem;">
+                    <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.5rem;">LLM Narrative (Stub)</div>
+                    <div style="background:var(--bg);border-radius:6px;padding:.75rem;font-size:.85rem;font-style:italic;color:var(--text-dim);">
+                        ${d.narrative}
+                    </div>
+                </div>`;
+            }
+
+            if (exp.weights_applied) {
+                html += `<div style="margin-top:1rem;">
+                    <div style="font-size:.75rem;color:var(--text-dim);text-transform:uppercase;margin-bottom:.5rem;">Weights Applied</div>
+                    <div style="background:var(--bg);border-radius:6px;padding:.75rem;font-family:var(--mono);font-size:.78rem;">
+                        ${JSON.stringify(exp.weights_applied, null, 2)}
+                    </div>
+                </div>`;
+            }
+
+            document.getElementById('modalContent').innerHTML = html;
+        } catch (e) {
+            document.getElementById('modalContent').textContent = `Error: ${e.message}`;
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('explainModal').classList.remove('active');
+    }
+    document.getElementById('explainModal').addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeModal();
+    });
+
+    // Auto-authenticate on load
+    authenticate();
+    </script>
+</body>
+</html>
